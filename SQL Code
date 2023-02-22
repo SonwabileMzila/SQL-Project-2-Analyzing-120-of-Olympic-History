@@ -1,0 +1,264 @@
+ How many total Olympic Games have been held in total (including Summer and Winter)?
+ -- So there are total 51 Olympics Games has been held till 2016 Summer Olympics including
+    all summer and Winter Olympic starting from 1896(Athens) till 2016(Rio) Olympics.
+
+  SELECT 
+         COUNT(DISTINCT games)
+    FROM "athlete_events.csv" 
+       order by 1 desc;
+
+Total No. of Countries Participated in each Summer/Winter Olympics?
+-- Highest number of Countries participated in 2008 Summer(292) while minimum was 1896 Summer(18).
+
+  SELECT 
+            games,
+           COUNT(distinct team) as Participated_Country_Count
+       FROM "athlete_events.csv" 
+           GROUP BY 1
+       order by 1 desc
+
+
+    How many Athletes have participated in Olympics?
+    -- There are total 1,35,571 athlete have participated in this event over 120 years.
+
+     SELECT 
+            count(distinct id)
+     FROM "athlete_events.csv"
+
+
+     Sex-wise Athletes participation in Olympics.
+     -- There are about 75% of male athlete have participant which shows the clear dominance of male athlete in Olympic Games
+
+     SELECT
+                 CASE
+                   WHEN sex = 'F' THEN 'Female'
+                   WHEN sex='M' THEN 'Male' 
+                END as Sex,
+                COUNT(distinct id) as "Total Athlete",
+               CONCAT(ROUND(COUNT(distinct id)*100.0/
+                   (select COUNT(distinct id) from "athlete_events.csv"),2),'%') as "Percentage of athlete"
+       FROM "athlete_events.csv" 
+             GROUP BY 1
+       order by 2 desc
+
+
+       How many Athletes won any medal?
+       -- There are total 33,745 athlete who won any medal in the Olympic Games which is about 25 % of total athletes.
+
+         WITH CTE AS
+        (
+           SELECT
+                 id,medal
+          FROM "athlete_events.csv"
+                 where medal is NOT NULL
+         GROUP BY 1,2
+       )
+      SELECT COUNT(*) FROM CTE; 
+
+
+     Which year saw the highest and lowest no of countries participating in Olympics?
+     -- Athens Summer Olympic in 1896 has minimum country participation while Beijing Summer Olympics has maximum country participation 2008.
+
+         (SELECT
+                games, COUNT(distinct team) as Max_and_Min_Participated_Country_Count
+      FROM "athlete_events.csv" 
+              GROUP BY 1
+       order by 2 desc
+              LIMIT 1)
+  UNION
+      (SELECT
+                games, COUNT(distinct team) as Max_and_MinParticipated_Country_Count
+       FROM "athlete_events.csv" 
+               GROUP BY 1
+       order by 2
+        LIMIT 1)
+
+
+      Which Nation has participated in all of the Olympic games?
+      -- There are total 5 countries which have participated in all the Olympics (France, Great Britain, Switzerland, Italy).
+
+       WITH CTE AS 
+       (
+                     SELECT 
+                            team,games,
+                            dense_RANK() OVER(partition by team order by games) as dr
+                    FROM "athlete_events.csv" 
+       )
+      SELECT 
+              distinct team
+      FROM CTE 
+             where dr=(SELECT COUNT(distinct games) from "athlete_events.csv" )
+
+
+       Identify the sport which was played in all summer Olympics.
+       -- Athletics, Cycling, Fencing, Gymnastics and Swimming are the only Sport played over all the Olympic Games.
+
+        WITH CTE AS
+     (
+             SELECT
+                       sport,games,
+                       DENSE_RANK() OVER(partition by sport order by games) as dr
+             FROM "athlete_events.csv" as tab1
+                      WHERE season='Summer'
+             group by games,sport
+       )
+    SELECT 
+          sport
+    FROM CTE 
+               WHERE dr=(SELECT COUNT(distinct games) FROM "athlete_events.csv" WHERE season='Summer')
+
+
+      Which Sports were just played only once in the Olympics?
+        -- There are total 11 Sports which are played once in Olympic Games.
+
+        SELECT 
+            sport, games
+    FROM "athlete_events.csv"
+            WHERE 
+    SPORT in (SELECT sport FROM "athlete_events.csv" GROUP BY 1 
+                          HAVING  COUNT(DISTINCT games)=1)
+    GROUP BY 1,2
+
+
+      Fetch the total no of sports played in each Olympic games.
+      -- There are highest 34 games has been played in summer Olympics of (2000,2004,2008,2016) while lowest 7 games has been played in (1932 winter)
+
+      SELECT 
+              games,    COUNT(DISTINCT sport) as total_games_count
+     FROM "athlete_events.csv" 
+            GROUP BY 1
+     order by 2 desc
+
+
+     Fetch the top 5 most successful countries in Olympics. Success is defined by no of medals won.
+     -- US is having the Highest number of medals.
+
+     SELECT 
+                 team, COUNT(medal) as medal_count
+      FROM "athlete_events.csv" 
+               GROUP BY team
+    order by medal_count desc
+                LIMIT 5
+
+
+     List down total gold, silver and bronze medals won by each country.
+
+      SELECT 
+              team,
+             COUNT(CASE WHEN medal='Gold' THEN 1 ELSE NULL END) as gold_medal_count,
+             COUNT(CASE WHEN medal='Silver' THEN 1 ELSE NULL END) as silver_medal_count,
+             COUNT(CASE WHEN medal='Bronze' THEN 1 ELSE NULL END) as bronze_medal_count
+     FROM "athlete_events.csv" as tab1
+             GROUP BY team
+     order by gold_medal_count desc,silver_medal_count desc,bronze_medal_count desc
+
+
+     List down total gold, silver and bronze medals won by each country corresponding to each Olympic games.
+     -- This is having the Medal count of countries in each of the Olympics Games held.
+
+     SELECT 
+              games,
+              team,
+             COUNT(CASE WHEN medal='Gold' THEN 1 ELSE NULL END) as gold_medal_count,
+             COUNT(CASE WHEN medal='Silver' THEN 1 ELSE NULL END) as silver_medal_count,
+             COUNT(CASE WHEN medal='Bronze' THEN 1 ELSE NULL END) as bronze_medal_count
+     FROM "athlete_events.csv" as tab1
+             GROUP BY games, team
+     order by games, gold_medal_count desc,silver_medal_count desc,bronze_medal_count desc
+
+
+     Fetch details of the oldest athletes to win a gold medal.
+     -- There are two Athlete who won the Gold Medal at the age of 64 and Both are Male while one from Shooting while other is from Roque.
+
+
+     WITH CTE AS
+     (
+        SELECT
+                     *,DENSE_RANK() OVER (order by age desc) as dr
+         FROM "athlete_events.csv" as tab1
+                     WHERE medal ='Gold' and age is not null
+      )
+      SELECT 
+               name, sex, age, team,
+               games, season, sport, event
+      FROM CTE 
+                WHERE dr=1
+
+
+      Fetch details of the youngest athletes to win a gold medal.
+      -- There are Total 7 athlete who won the Gold medal at the age of 13 where 5 out of 7 was Female.
+
+      WITH CTE AS
+   (
+               SELECT 
+                        *,DENSE_RANK() OVER (order by age) as dr
+               FROM "athlete_events.csv" as tab1
+                      WHERE medal ='Gold' and age is not null
+      )
+    SELECT 
+            age, sex, name, team, games, sport, event
+   FROM CTE WHERE dr=1
+
+
+     Fetch the top 5 athletes who have won the most gold medals. 
+     -- Michael Phelps won the Highest 23 Gold medal.
+
+      WITH CTE AS
+       (
+          SELECT id, name, team, COUNT(*) as cnt
+                      FROM "athlete_events.csv" as tab1
+          where medal ='Gold'
+                    GROUP BY id,name,team
+         ORDER BY 4 desc
+     ),
+    CTE1 AS
+    (
+              SELECT
+                        *,DENSE_RANK() OVER(order by cnt desc) as dr
+              FROM CTE 
+   )
+  SELECT 
+             id, name, team, cnt as "Total Gold medals" 
+  FROM CTE1
+        WHERE dr<=5
+
+
+
+      Fetch the top 5 athletes who have won the most medals (gold/silver/bronze).
+
+
+       WITH CTE AS
+       (
+          SELECT id, name, team, COUNT(medal) as cnt
+                      FROM "athlete_events.csv" as tab1
+           GROUP BY id,name,team
+                    ORDER BY 4 desc
+     ),
+    CTE1 AS
+    (
+              SELECT
+                        *,DENSE_RANK() OVER(order by cnt desc) as dr
+              FROM CTE 
+   )
+  SELECT 
+             id, name, team, cnt as "Total medals" 
+  FROM CTE1
+        WHERE dr<=5
+
+
+
+      Which countries have never won gold medal but have won silver/bronze medals?
+      -- There are total 256 Countries who have not win any Gold medal while won silver or Bronze
+
+       SELECT
+                  distinct team 
+          FROM "athlete_events.csv" 
+                 where team IN (SELECT distinct team FROM "athlete_events.csv" WHERE medal IN('Silver', 
+                 'Bronze')  
+  EXCEPT 
+          SELECT 
+                  distinct team
+          FROM "athlete_events.csv"
+                 WHERE medal IN('Gold')
+   ) 
+  order by 1
